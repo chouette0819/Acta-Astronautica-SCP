@@ -69,6 +69,18 @@ PowerShell (Terminal) Commands
 - QP vs SCP comparison plot:
   - matlab -batch "startup; compare_QP_SCP_plot"
 
+Keep Plots Open (interactive)
+- Desktop session (recommended for keeping figures on screen):
+  - matlab -desktop -r "startup; SCP_KOZ_QP"
+  - matlab -desktop -r "startup; SCP_Ellipsoid"
+  - matlab -desktop -r "startup; run_qcqp_custom"
+- Absolute MATLAB path example:
+  - & "C:\\Program Files\\MATLAB\\R2023b\\bin\\matlab.exe" -desktop -r "startup; SCP_KOZ_QP"
+
+Notes on -batch vs -desktop
+- -batch runs headless and exits when the command finishes; figures may close with MATLAB.
+- Use -desktop/-r for interactive work or to inspect plots persistently.
+
 Notes
 - Large figure asset: ISS_data3_mesh120_opac05_dull.fig is used for optional overlay.
 - Images such as koz_surfaces_with_path.png, scp_koz_results.png, compare_qp_scp.png land in GA-STM/.
