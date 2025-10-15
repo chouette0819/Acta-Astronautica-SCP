@@ -272,7 +272,7 @@ function [H,f,A,b,Aeq,beq,lb,ub,idx] = build_miqp_qprelax(stm, N, x0, xf, missio
     A=sparse(0,nvars); b=zeros(0,1); zptr=0;
     for k=k0:k1
         for i=1:nBoxes
-            B=boxes(:,:,i); lx=B[1,1]; ux=B[2,1]; ly=B[1,2]; uy=B[2,2]; lz=B[1,3]; uz=B[2,3]; %#ok<NBRAK>
+            B = boxes(:,:,i); lx = B(1,1); ux = B(2,1); ly = B(1,2); uy = B(2,2); lz = B(1,3); uz = B(2,3);
             pbar=Epos*Xbar(:,k); gate_on=(abs(pbar(2))<=ko.near_Tgate);
             z1=Zofs+zptr+1; z2=z1+1; z3=z2+1; z4=z3+1; z5=z4+1; z6=z5+1; zidx=[z1 z2 z3 z4 z5 z6];
             if gate_on
@@ -310,4 +310,3 @@ function draw_box(B)
         for i=1:size(E,1), p1=V(E(i,1),:); p2=V(E(i,2),:); plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],'Color',[1 0 0]); end
     end
 end
-
