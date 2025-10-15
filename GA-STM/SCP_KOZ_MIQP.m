@@ -48,11 +48,14 @@ koz.expr_dir   = 'C:\\Users\\98kim\\Desktop\\Acta-Astronautica\\Funcs_ISS_expr';
 koz.domain_lo  = [-100; -100; -100];  % [m]
 koz.domain_hi  = [ 100;  100;  100];  % [m]
 koz.grid_res   = 60;
-koz.max_expr   = 12;
+koz.max_expr   = inf;                 % use all expr files found
 koz.face_eps   = 0.02;                 % [m] clearance
 koz.bigM       = 1000;                  % [m]
 koz.window     = [0.0, 1.0];            % active across whole horizon
 koz.near_Tgate = inf;                   % |T|<=gate to activate
+koz.expand_iters = 3;                   % expand domain if no isosurface found
+koz.expand_factor= 2.0;                 % expansion factor per try
+koz.abs_threshold= 0.02;                % |F-1| threshold as fallback
 
 % Weights (match SCP spirit; can be tuned)
 weights = struct();
@@ -131,30 +134,48 @@ function boxes = build_koz_aabbs(ko)
         warning('Expr dir not found: %s', ko.expr_dir); return;
     end
     d = dir(fullfile(ko.expr_dir,'*_*_expr.txt'));
-    take = min(numel(d), ko.max_expr);
+    take = numel(d);
+    if isfinite(ko.max_expr), take = min(take, ko.max_expr); end
     if take==0, return; end
-    xv = linspace(ko.domain_lo(1), ko.domain_hi(1), ko.grid_res);
-    yv = linspace(ko.domain_lo(2), ko.domain_hi(2), ko.grid_res);
-    zv = linspace(ko.domain_lo(3), ko.domain_hi(3), ko.grid_res);
-    [Xg,Yg,Zg] = meshgrid(xv,yv,zv);
     for i=1:take
         expr_path = fullfile(ko.expr_dir, d(i).name);
         Fh = make_F_from_expr(expr_path);
         if isempty(Fh), continue; end
-        try
+        lo_i = ko.domain_lo(:)'; hi_i = ko.domain_hi(:)';
+        grabbed = false;
+        for it=1:max(1, ko.expand_iters)
+            xv = linspace(lo_i(1), hi_i(1), ko.grid_res);
+            yv = linspace(lo_i(2), hi_i(2), ko.grid_res);
+            zv = linspace(lo_i(3), hi_i(3), ko.grid_res);
+            [Xg,Yg,Zg] = meshgrid(xv,yv,zv);
             V = arrayfun(@(x,y,z) Fh(x,y,z), Xg, Yg, Zg) - 1;
-            S = isosurface(Xg, Yg, Zg, V, 0);
-            if isempty(S.vertices), continue; end
-            lo = min(S.vertices, [], 1); hi = max(S.vertices, [], 1);
-            B = [lo(1) hi(1); lo(2) hi(2); lo(3) hi(3)]; % [x;y;z] rows
-            boxes(:,:,end+1) = [B(1,:); B(2,:)]; %#ok<AGROW> % 2x3: low; high
-        catch
-            V = arrayfun(@(x,y,z) Fh(x,y,z), Xg, Yg, Zg) - 1;
-            mask = V < 0; if ~any(mask(:)), continue; end
-            [I,J,K] = ind2sub(size(V), find(mask));
-            lo = [xv(min(I)) yv(min(J)) zv(min(K))];
-            hi = [xv(max(I)) yv(max(J)) zv(max(K))];
-            boxes(:,:,end+1) = [lo; hi]; %#ok<AGROW>
+            S = [];
+            try
+                S = isosurface(Xg, Yg, Zg, V, 0);
+            catch
+            end
+            if ~isempty(S) && isfield(S,'vertices') && ~isempty(S.vertices)
+                lo = min(S.vertices, [], 1); hi = max(S.vertices, [], 1);
+                boxes(:,:,end+1) = [lo; hi]; %#ok<AGROW>
+                grabbed = true; break;
+            end
+            % fallback: use |F-1|<=tau shell
+            tau = ko.abs_threshold;
+            shell = abs(V) <= tau;
+            if any(shell(:))
+                [I,J,K] = ind2sub(size(V), find(shell));
+                lo = [xv(min(I)) yv(min(J)) zv(min(K))];
+                hi = [xv(max(I)) yv(max(J)) zv(max(K))];
+                boxes(:,:,end+1) = [lo; hi]; %#ok<AGROW>
+                grabbed = true; break;
+            end
+            % expand box and retry
+            c = 0.5*(lo_i + hi_i); h = 0.5*(hi_i - lo_i)*ko.expand_factor;
+            lo_i = c - h; hi_i = c + h;
+        end
+        if ~grabbed
+            % last fallback: skip with notice
+            % fprintf('AABB: no isosurface/shell found for %s within expanded domains.\n', d(i).name);
         end
     end
 end
