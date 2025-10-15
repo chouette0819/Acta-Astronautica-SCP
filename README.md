@@ -1,7 +1,7 @@
-Rendezvous (SCP + QCQP) â€” Quick Guide
+Rendezvous (SCP + QCQP) ??Quick Guide
 
 Overview
-- MATLAB-based orbit-rendezvous experiments using the Gimâ€“Alfriend STM (with J2) in LVLH.
+- MATLAB-based orbit-rendezvous experiments using the Gim?“Alfriend STM (with J2) in LVLH.
 - Includes: Successive Convexification (SCP) with keep-out zones (KOZ), and QCQP/QP/LP baselines.
 
 Requirements
@@ -39,15 +39,15 @@ Run: SCP with Ellipsoidal KOZ (simple)
 - Reads `custom_states.csv` for start/goal, enforces an ellipsoidal KOZ only.
 - Produces `GA-STM/scp_ellipsoid_last.mat` and figures.
 
-- Run: MIQP with AABB KOZ (same domain as SCP)
+Run: MIQP with AABB KOZ (same domain as SCP)
 - Script: `GA-STM/SCP_KOZ_MIQP.m` (defaults to quadprog QP-relaxation; optional Gurobi)
 - What it does:
   - Same time grid and start/goal as `SCP_KOZ_QP` by default (`dt=1, N=60`, Â±50 m on T-axis).
-  - L2 objective (QP-like) with mixed-integer bigâ€‘M disjunctions to stay outside AABB approximations of implicit KOZ.
+  - L2 objective (QP-like) with mixed-integer big?‘M disjunctions to stay outside AABB approximations of implicit KOZ.
   - Saves `GA-STM/scp_miqp_last.mat` and plots.
 - Configure in-file:
   - `expr_dir` (default: `C:\Users\98kim\Desktop\Acta-Astronautica\Funcs_ISS_expr`)
-  - domain `[-100,100] m`, `grid_res`, and bigâ€‘M/clearance.
+  - domain `[-100,100] m`, `grid_res`, and big?‘M/clearance.
 
 Run: QCQP (custom start/goal)
 - Script: `run_qcqp_custom.m`
