@@ -40,16 +40,15 @@ Run: SCP with Ellipsoidal KOZ (simple)
 - Reads `custom_states.csv` for start/goal, enforces an ellipsoidal KOZ only.
 - Produces `GA-STM/scp_ellipsoid_last.mat` and figures.
 
-Run: MILP with AABB KOZ (no SCP)
-- Script: `GA-STM/SCP_KOZ_MILP.m`
+Run: MIQP with AABB KOZ (same domain as SCP)
+- Script: `GA-STM/SCP_KOZ_MIQP.m` (requires Gurobi)
 - What it does:
-  - Builds discrete STM and solves a single-shot MILP with L1 objective.
-  - Approximates each implicit surface by an axis-aligned bounding box (AABB) via isosurface sampling, then enforces outside-of-box with mixed-integer big-M constraints along the horizon.
-  - Saves `GA-STM/scp_milp_last.mat` and plots.
+  - Same time grid and start/goal as `SCP_KOZ_QP` by default (`dt=1, N=60`, ±50 m on T-axis).
+  - L2 objective (QP-like) with mixed-integer big‑M disjunctions to stay outside AABB approximations of implicit KOZ.
+  - Saves `GA-STM/scp_miqp_last.mat` and plots.
 - Configure in-file:
   - `expr_dir` (default: `C:\Users\98kim\Desktop\Acta-Astronautica\Funcs_ISS_expr`)
-  - domain `[-100,100] m` and grid resolution for sampling (`grid_res`)
-  - weights (`R, w_v, w_tr`), time grid (`dt,N`), and big-M/clearance (`bigM, face_eps`).
+  - domain `[-100,100] m`, `grid_res`, and big‑M/clearance.
 
 Run: QCQP (custom start/goal)
 - Script: `run_qcqp_custom.m`
