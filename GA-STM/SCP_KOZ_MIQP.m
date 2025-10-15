@@ -11,10 +11,8 @@
 % - Time grid and start/goal are set to match SCP_KOZ_QP defaults.
 
 clear; clc; close all;
-
-if exist('gurobi','file')~=2
-    error('Gurobi MATLAB API not found on path. MIQP requires Gurobi.');
-end
+% Solver selection: 'quadprog' (QP relaxation) or 'gurobi' (exact MIQP if available)
+solver = 'quadprog';  % change to 'gurobi' to use Gurobi MIQP
 
 %% Problem setup (match SCP_KOZ_QP)
 params = struct();
@@ -74,26 +72,26 @@ boxes = build_koz_aabbs(koz);
 fprintf('KOZ AABBs generated: %d\n', size(boxes,3));
 
 %% Build MIQP (Gurobi)
-[model, idx] = build_miqp_gurobi(stm, N, RelInitState, RelFinalState, mission, weights, Xbar, boxes, koz);
-
-params_grb = struct();
-params_grb.OutputFlag = 1;
-params_grb.MIPGap = 1e-3;
-params_grb.TimeLimit = 300;
-params_grb.Method = 1; % dual simplex for root LPs
-
-result = gurobi(model, params_grb);
-
-if ~isfield(result,'x')
-    error('MIQP failed: status=%s', string(result.status));
+switch lower(solver)
+    case 'gurobi'
+        if exist('gurobi','file')~=2
+            error('Gurobi MATLAB API not found on path. Set solver=''quadprog'' or add Gurobi to path.');
+        end
+        [model, idx] = build_miqp_gurobi(stm, N, RelInitState, RelFinalState, mission, weights, Xbar, boxes, koz);
+        params_grb = struct(); params_grb.OutputFlag = 1; params_grb.MIPGap = 1e-3; params_grb.TimeLimit = 300; params_grb.Method = 1;
+        result = gurobi(model, params_grb);
+        if ~isfield(result,'x'); error('MIQP failed: status=%s', string(result.status)); end
+        z = result.x; [X,U,V] = unpack(z, idx, N); solver_note = sprintf('Gurobi MIQP (gap=%s)', string(conditional_field(result,'mipgap','N/A')));
+    otherwise % 'quadprog' relaxation
+        [H,f,A,b,Aeq,beq,lb,ub,idx] = build_miqp_qprelax(stm, N, RelInitState, RelFinalState, mission, weights, Xbar, boxes, koz);
+        opts = optimoptions('quadprog','Display','iter','MaxIterations',2000,'OptimalityTolerance',1e-8,'ConstraintTolerance',1e-8);
+        [z, fval_qp, exitflag_qp] = quadprog(H,f,A,b,Aeq,beq,lb,ub,[],opts); %#ok<ASGLU>
+        [X,U,V] = unpack(z, idx, N); solver_note = 'quadprog QP-relaxation (binaries relaxed)';
 end
-
-[X,U,V] = unpack(result.x, idx, N);
 
 %% Diagnostics and plots
 dv = sum(vecnorm(U,2,1))*dt;
-fprintf('Status: %s, Obj: %.6e, Cum dV: %.3f m/s, Gap: %s\n', string(result.status), result.objval, dv, ...
-    conditional_field(result,'mipgap','N/A'));
+fprintf('Solver: %s, Cum dV: %.3f m/s\n', solver_note, dv);
 
 figure('Position',[60 60 1200 700]);
 subplot(2,2,1);
@@ -303,6 +301,60 @@ function [model, idx] = build_miqp_gurobi(stm, N, x0, xf, mission, weights, Xbar
     model.rhs = [rhs; bl];
     model.sense = [repmat('=', size(Aeq,1),1); sense];
     model.lb = lb; model.ub = ub; model.vtype = vtype; model.modelsense = 'min';
+end
+
+function [H,f,A,b,Aeq,beq,lb,ub,idx] = build_miqp_qprelax(stm, N, x0, xf, mission, weights, Xbar, boxes, ko)
+    % Same structure as build_miqp_gurobi, but returns quadprog inputs and relaxes binaries to [0,1]
+    nx=6; nu=3; nv=6; Epos = [1 0 0 0 0 0; 0 0 1 0 0 0; 0 0 0 0 1 0];
+    nX = N*nx; nU=(N-1)*nu; nV=(N-1)*nv;
+    nBoxes = size(boxes,3); faces_per_box = 6;
+    k0 = max(1, floor(ko.window(1)*(N-1))+1); k1 = min(N, ceil(ko.window(2)*(N-1))+1);
+    nKwin = max(0, k1-k0+1); nZ = nKwin * nBoxes * faces_per_box;
+    nvars = nX + nU + nV + nZ;
+    lb = -inf(nvars,1); ub = inf(nvars,1);
+    % bounds on U
+    Uofs = nX; Vofs = nX+nU; Zofs = nX+nU+nV;
+    for k=1:N-1, iu=Uofs+(k-1)*nu+(1:nu); lb(iu)=-mission.u_max; ub(iu)=mission.u_max; end
+    % binaries relaxed to [0,1]
+    if nZ>0, lb(Zofs+1:Zofs+nZ)=0; ub(Zofs+1:Zofs+nZ)=1; end
+    % Quadratic H and linear f
+    H = sparse(nvars,nvars); f = zeros(nvars,1);
+    for k=1:N-1, iu=Uofs+(k-1)*nu+(1:nu); H(iu,iu)=H(iu,iu)+2*weights.R*eye(nu); end
+    for k=1:N-1, iv=Vofs+(k-1)*nv+(1:nv); H(iv,iv)=H(iv,iv)+2*weights.w_v*eye(nv); end
+    for k=1:N, ix=(k-1)*nx+(1:nx); H(ix,ix)=H(ix,ix)+2*weights.w_tr*eye(nx); f(ix)=f(ix)-2*weights.w_tr*Xbar(:,k); end
+    % Equalities
+    Aeq = sparse(nx + nx*(N-1) + nx, nvars); beq = zeros(size(Aeq,1),1); row=0;
+    Aeq(row+(1:nx), 1:nx) = eye(nx); beq(row+(1:nx))=x0; row=row+nx;
+    for k=1:N-1
+        rows=row+(1:nx); Aeq(rows, (k)*nx+(1:nx))=eye(nx); Aeq(rows, (k-1)*nx+(1:nx))=-stm.Ak(:,:,k);
+        iu = Uofs+(k-1)*nu+(1:nu); Aeq(rows, iu) = -stm.Bk(:,1:3,k);
+        iv = Vofs+(k-1)*nv+(1:nv); Aeq(rows, iv) = -eye(nx);
+        row=row+nx;
+    end
+    Aeq(row+(1:nx), (N-1)*nx+(1:nx))=eye(nx); beq(row+(1:nx))=xf;
+    % Inequalities (<=)
+    A = sparse(0,nvars); b = zeros(0,1);
+    zptr = 0;
+    for k=k0:k1
+        for i=1:nBoxes
+            B=boxes(:,:,i); lx=B(1,1); ux=B(2,1); ly=B(1,2); uy=B(2,2); lz=B(1,3); uz=B(2,3);
+            pbar = Epos*Xbar(:,k); gate_on = (abs(pbar(2)) <= ko.near_Tgate);
+            z1 = Zofs+zptr+1; z2=z1+1; z3=z2+1; z4=z3+1; z5=z4+1; z6=z5+1; zidx=[z1 z2 z3 z4 z5 z6];
+            if gate_on
+                ix=(k-1)*nx+(1:nx);
+                a = sparse(1,nvars); a(ix(1))= 1; a(z1)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM + (lx - ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(ix(1))=-1; a(z2)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM - (ux + ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(ix(3))= 1; a(z3)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM + (ly - ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(ix(3))=-1; a(z4)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM - (uy + ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(ix(5))= 1; a(z5)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM + (lz - ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(ix(5))=-1; a(z6)=ko.bigM; A(end+1,:)=a; b(end+1,1)=ko.bigM - (uz + ko.face_eps); %#ok<AGROW>
+                a = sparse(1,nvars); a(zidx) = -1; A(end+1,:)=a; b(end+1,1) = -1; %#ok<AGROW>
+            end
+            zptr = zptr + faces_per_box;
+        end
+    end
+    idx = struct(); idx.X=@(k)((k-1)*nx+1):(k*nx);
+    lb = lb; ub = ub; % return
 end
 
 function [X,U,V] = unpack(z, idx, N)

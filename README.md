@@ -15,7 +15,6 @@ Repo Layout
 - `GA-STM/` MATLAB classes and scripts (GimAlfriendSTM, SCP, baselines)
 - `startup.m` Adds `GA-STM/` recursively to MATLAB path
 - `run_qcqp_custom.m` QCQP-like run with fallback to `fmincon`
-- `GA-STM/SCP_KOZ_MILP.m` MILP-based AABB KOZ avoidance (L1 objective)
 - `custom_states.csv` Two rows `[x vx y vy z vz]` in meters (start/goal)
 - `prepare_custom_states.py` Helper to build `custom_states.csv` from `.npy`
 
@@ -40,8 +39,8 @@ Run: SCP with Ellipsoidal KOZ (simple)
 - Reads `custom_states.csv` for start/goal, enforces an ellipsoidal KOZ only.
 - Produces `GA-STM/scp_ellipsoid_last.mat` and figures.
 
-Run: MIQP with AABB KOZ (same domain as SCP)
-- Script: `GA-STM/SCP_KOZ_MIQP.m` (requires Gurobi)
+- Run: MIQP with AABB KOZ (same domain as SCP)
+- Script: `GA-STM/SCP_KOZ_MIQP.m` (defaults to quadprog QP-relaxation; optional Gurobi)
 - What it does:
   - Same time grid and start/goal as `SCP_KOZ_QP` by default (`dt=1, N=60`, ±50 m on T-axis).
   - L2 objective (QP-like) with mixed-integer big‑M disjunctions to stay outside AABB approximations of implicit KOZ.
