@@ -82,7 +82,8 @@ end
 
 %% Diagnostics and plots
 dv = sum(vecnorm(U,2,1))*dt;
-fprintf('Objective(L1): %.6e, Cum dV: %.3f m/s, exit=%d, iters=%d\n', fval, dv, exitflag, getfield(output,'relativegap',NaN)); %#ok<GFLD>
+gap = NaN; if exist('output','var') && isstruct(output) && isfield(output,'relativegap'), gap = output.relativegap; end
+fprintf('Objective(L1): %.6e, Cum dV: %.3f m/s, exit=%d, gap=%.3g\n', fval, dv, exitflag, gap);
 
 figure('Position',[60 60 1200 700]);
 subplot(2,2,1); hold on; grid on; box on;
@@ -257,25 +258,21 @@ function [c, A, b, Aeq, beq, lb, ub, intcon, idx] = build_milp(stm, N, x0, xf, m
     % 2) AABB KOZ disjunction rows: for each (k,i), 6 big-M + 1 sum(z)>=1
     nKwin = (k1-k0+1); nPairs = nKwin * nBoxes; nI = nI + nPairs*(faces_per_box + 1);
     Ai = sparse(nI, nvar); bi = zeros(nI,1); r=0;
-    % TU/TV
+    % TU/TV (block rows)
     for k=1:N-1
         iu = (nX+(k-1)*nu+1):(nX+k*nu); tu = (TUofs+(k-1)*nu+1):(TUofs+k*nu);
-        % TU >= U
-        r=r+1; Ai(r,tu) = -eye(nu,nu); Ai(r,iu) = eye(nu,nu); bi(r)=0; r=r+nu-1;
-        % TU >= -U
-        r=r+1; Ai(r,tu) = -eye(nu,nu); Ai(r,iu) = -eye(nu,nu); bi(r)=0; r=r+nu-1;
+        rows = r+(1:nu); Ai(rows,tu) = -eye(nu); Ai(rows,iu) = eye(nu); bi(rows)=0; r = r+nu; % TU >= U
+        rows = r+(1:nu); Ai(rows,tu) = -eye(nu); Ai(rows,iu) = -eye(nu); bi(rows)=0; r = r+nu; % TU >= -U
         iv = (Vofs+(k-1)*nv+1):(Vofs+k*nv); tv = (TVofs+(k-1)*nv+1):(TVofs+k*nv);
-        % TV >= V
-        r=r+1; Ai(r,tv) = -eye(nv,nv); Ai(r,iv) = eye(nv,nv); bi(r)=0; r=r+nv-1;
-        % TV >= -V
-        r=r+1; Ai(r,tv) = -eye(nv,nv); Ai(r,iv) = -eye(nv,nv); bi(r)=0; r=r+nv-1;
+        rows = r+(1:nv); Ai(rows,tv) = -eye(nv); Ai(rows,iv) =  eye(nv); bi(rows)=0; r = r+nv; % TV >= V
+        rows = r+(1:nv); Ai(rows,tv) = -eye(nv); Ai(rows,iv) = -eye(nv); bi(rows)=0; r = r+nv; % TV >= -V
     end
     % DX >= |X - Xbar|
     if use_tr
         for k=1:N
             ix = idx.X(k); dx = (DXofs+(k-1)*nx+1):(DXofs+k*nx);
-            r=r+1; Ai(r,dx) = -eye(nx,nx); Ai(r,ix) = eye(nx,nx); bi(r) = Xbar(:,k); r=r+nx-1;
-            r=r+1; Ai(r,dx) = -eye(nx,nx); Ai(r,ix) = -eye(nx,nx); bi(r) = -Xbar(:,k); r=r+nx-1;
+            rows = r+(1:nx); Ai(rows,dx) = -eye(nx); Ai(rows,ix) =  eye(nx); bi(rows) =  Xbar(:,k); r = r+nx;   % DX >= X - Xbar
+            rows = r+(1:nx); Ai(rows,dx) = -eye(nx); Ai(rows,ix) = -eye(nx); bi(rows) = -Xbar(:,k); r = r+nx;   % DX >= -(X - Xbar)
         end
     end
     % 3) AABB KOZ with big-M
@@ -286,7 +283,8 @@ function [c, A, b, Aeq, beq, lb, ub, intcon, idx] = build_milp(stm, N, x0, xf, m
     for k=k0:k1
         xk = idx.X(k);
         for i=1:nBoxes
-            B = boxes(:,:,i); lx=B(1,1); ux=B(1,2); ly=B(2,1); uy=B(2,2); lz=B(3,1); uz=B(3,2);
+            B = boxes(:,:,i); % 2x3: [low; high] by columns x,y,z
+            lx=B(1,1); ux=B(2,1); ly=B(1,2); uy=B(2,2); lz=B(1,3); uz=B(2,3);
             % gate by |T|<=near_Tgate
             pbar = Epos*Xbar(:,k);
             gate_on = (abs(pbar(2)) <= ko.near_Tgate);
@@ -337,4 +335,3 @@ function draw_box(B)
     K = convhull(P);
     trisurf(K, P(:,1)/1e3, P(:,2)/1e3, P(:,3)/1e3, 'FaceAlpha',0.05, 'EdgeColor',[1 0 0], 'FaceColor',[1 0 0]);
 end
-
