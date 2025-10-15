@@ -109,18 +109,9 @@ end
 
 X = best.X; U = best.U;
 
-%% Plot
-figure('Position',[60 60 1200 700]); subplot(2,2,1); hold on; grid on; box on;
-for i=1:size(boxes,3), draw_box(boxes(:,:,i)); end
-plot3(Xbar(1,:)/1e3, Xbar(3,:)/1e3, Xbar(5,:)/1e3,'--','Color',[0.6 0.6 0.6],'LineWidth',1.0);
-plot3(X(1,:)/1e3, X(3,:)/1e3, X(5,:)/1e3,'b-','LineWidth',2);
-plot3(X(1,1)/1e3, X(3,1)/1e3, X(5,1)/1e3,'go','MarkerFaceColor','g');
-plot3(X(1,end)/1e3, X(3,end)/1e3, X(5,end)/1e3,'ro','MarkerFaceColor','r');
-axis equal; view(45,30); xlabel('X [km]'); ylabel('Y [km]'); zlabel('Z [km]'); title('SCP + MI KOZ (AABB)');
-
-subplot(2,2,2); stairs(time_vec(1:end-1)/3600, vecnorm(U,2,1)*1e3,'k-','LineWidth',1.5); grid on; xlabel('Time [h]'); ylabel('|u| [mm/s^2]');
-subplot(2,2,3); rel = sqrt(sum(X([1,3,5],:).^2,1)); plot(time_vec/3600, rel,'m-','LineWidth',2); grid on; xlabel('Time [h]'); ylabel('Range [m]');
-subplot(2,2,4); dv_cum = [0 cumsum(vecnorm(U,2,1)*dt)]; plot(time_vec/3600, dv_cum,'g-','LineWidth',2); grid on; xlabel('Time [h]'); ylabel('Cum. dV [m/s]');
+%% Plot (match SCP_QP style)
+local_visualize_like_scp(X, Xbar, U, time_vec, boxes);
+try, print(gcf, fullfile(fileparts(mfilename('fullpath')), 'scp_koz_results_scpmiqp.png'), '-dpng','-r150'); catch, end
 
 try, save(fullfile(fileparts(mfilename('fullpath')),'scp_scpmiqp_last.mat'),'X','U','boxes','time_vec'); catch, end
 
@@ -309,4 +300,39 @@ function draw_box(B)
         E=[1 2;2 3;3 4;4 1; 5 6;6 7;7 8;8 5; 1 5;2 6;3 7;4 8]; hold on;
         for i=1:size(E,1), p1=V(E(i,1),:); p2=V(E(i,2),:); plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],'Color',[1 0 0]); end
     end
+end
+
+function local_visualize_like_scp(X, Xbar, U, time_vec, boxes)
+    figure('Position',[60 60 1200 700]);
+    subplot(2,2,1); hold on; grid on; box on;
+    if nargin>=5 && ~isempty(boxes)
+        for i=1:size(boxes,3)
+            draw_box(boxes(:,:,i));
+        end
+    end
+    if ~isempty(Xbar)
+        h_init = plot3(Xbar(1,:)/1e3, Xbar(3,:)/1e3, Xbar(5,:)/1e3,'--','Color',[0.5 0.5 0.5],'LineWidth',1.5);
+    else
+        h_init = gobjects(0);
+    end
+    h_final = plot3(X(1,:)/1e3, X(3,:)/1e3, X(5,:)/1e3,'b-','LineWidth',2);
+    h_start = plot3(X(1,1)/1e3, X(3,1)/1e3, X(5,1)/1e3,'go','MarkerFaceColor','g');
+    h_goal  = plot3(X(1,end)/1e3, X(3,end)/1e3, X(5,end)/1e3,'ro','MarkerFaceColor','r');
+    axis equal; view(45,30);
+    xlim([-0.1 0.1]); ylim([-0.1 0.1]); zlim([-0.1 0.1]);
+    xlabel('X [km]'); ylabel('Y [km]'); zlabel('Z [km]'); title('3D Trajectory (pre/post) + KOZ');
+    if ~isempty(h_init)
+        legend([h_init h_final h_start h_goal], {'Initial traj','Final traj','Start','Goal'}, 'Location','northwest');
+    else
+        legend([h_final h_start h_goal], {'Final traj','Start','Goal'}, 'Location','northwest');
+    end
+    subplot(2,2,2);
+    stairs(time_vec(1:end-1)/3600, vecnorm(U,2,1)*1e3,'k-','LineWidth',1.5); grid on;
+    xlabel('Time [h]'); ylabel('|u| [mm/s^2]'); title('Control magnitude');
+    subplot(2,2,3);
+    rel = sqrt(sum(X([1,3,5],:).^2,1));
+    plot(time_vec/3600, rel,'m-','LineWidth',2); grid on; xlabel('Time [h]'); ylabel('Range [m]');
+    subplot(2,2,4);
+    dt = mean(diff(time_vec)); dv_cum = [0 cumsum(vecnorm(U,2,1)*dt)];
+    plot(time_vec/3600, dv_cum,'g-','LineWidth',2); grid on; xlabel('Time [h]'); ylabel('Cum. dV [m/s]');
 end
