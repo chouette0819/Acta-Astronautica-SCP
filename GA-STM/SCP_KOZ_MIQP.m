@@ -274,18 +274,19 @@ function [model, idx] = build_miqp_gurobi(stm, N, x0, xf, mission, weights, Xbar
             z1 = Zofs+zptr+1; z2=z1+1; z3=z2+1; z4=z3+1; z5=z4+1; z6=z5+1;
             zidx = [z1 z2 z3 z4 z5 z6];
             if gate_on
+                ix = idx.X(k);
                 % x <= lx-eps + M*(1-z1)
-                a = sparse(1, nvars); a(idx.X(k)(1)) = 1; a(z1) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (lx - ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(1)) = 1;  a(z1) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (lx - ko.face_eps); sense(end+1,1) = '<';
                 % x >= ux+eps - M*(1-z2)  -> -x <= -ux-eps + M*(1-z2)
-                a = sparse(1, nvars); a(idx.X(k)(1)) = -1; a(z2) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (ux + ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(1)) = -1; a(z2) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (ux + ko.face_eps); sense(end+1,1) = '<';
                 % y <= ly-eps + M*(1-z3)
-                a = sparse(1, nvars); a(idx.X(k)(3)) = 1; a(z3) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (ly - ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(3)) = 1;  a(z3) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (ly - ko.face_eps); sense(end+1,1) = '<';
                 % y >= uy+eps - M*(1-z4)
-                a = sparse(1, nvars); a(idx.X(k)(3)) = -1; a(z4) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (uy + ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(3)) = -1; a(z4) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (uy + ko.face_eps); sense(end+1,1) = '<';
                 % z <= lz-eps + M*(1-z5)
-                a = sparse(1, nvars); a(idx.X(k)(5)) = 1; a(z5) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (lz - ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(5)) = 1;  a(z5) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM + (lz - ko.face_eps); sense(end+1,1) = '<';
                 % z >= uz+eps - M*(1-z6)
-                a = sparse(1, nvars); a(idx.X(k)(5)) = -1; a(z6) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (uz + ko.face_eps); sense(end+1,1) = '<';
+                a = sparse(1, nvars); a(ix(5)) = -1; a(z6) = ko.bigM; Al(end+1,:) = a; bl(end+1,1) = ko.bigM - (uz + ko.face_eps); sense(end+1,1) = '<';
                 % sum(z) >= 1  ->  -z1 - ... - z6 <= -1
                 a = sparse(1, nvars); a(zidx) = -1; Al(end+1,:) = a; bl(end+1,1) = -1; sense(end+1,1) = '<';
             else
@@ -318,4 +319,3 @@ function draw_box(B)
     K = convhull(P);
     trisurf(K, P(:,1)/1e3, P(:,2)/1e3, P(:,3)/1e3, 'FaceAlpha',0.05, 'EdgeColor',[1 0 0], 'FaceColor',[1 0 0]);
 end
-
