@@ -365,9 +365,34 @@ function [X,U,V] = unpack(z, idx, N)
 end
 
 function draw_box(B)
-    % B: 2x3: [low; high]
+    % B: 2x3: [low; high] for x,y,z
     lx=B(1,1); ux=B(2,1); ly=B(1,2); uy=B(2,2); lz=B(1,3); uz=B(2,3);
-    [Xc,Yc,Zc] = ndgrid([lx ux],[ly uy],[lz uz]); P = [Xc(:), Yc(:), Zc(:)];
-    K = convhull(P);
-    trisurf(K, P(:,1)/1e3, P(:,2)/1e3, P(:,3)/1e3, 'FaceAlpha',0.05, 'EdgeColor',[1 0 0], 'FaceColor',[1 0 0]);
+    % 8 corners
+    V = [lx ly lz;
+         ux ly lz;
+         ux uy lz;
+         lx uy lz;
+         lx ly uz;
+         ux ly uz;
+         ux uy uz;
+         lx uy uz];
+    V = V/1e3; % km for plotting
+    % Faces (quads)
+    F = [1 2 3 4;  % bottom z=lz
+         5 6 7 8;  % top z=uz
+         1 2 6 5;  % side x
+         2 3 7 6;  % side y
+         3 4 8 7;  % side x
+         4 1 5 8]; % side y
+    try
+        patch('Faces',F,'Vertices',V,'FaceAlpha',0.05,'EdgeColor',[1 0 0], 'FaceColor',[1 0 0]);
+    catch
+        % Fallback: wireframe
+        E = [1 2;2 3;3 4;4 1; 5 6;6 7;7 8;8 5; 1 5;2 6;3 7;4 8];
+        hold on;
+        for i=1:size(E,1)
+            p1 = V(E(i,1),:); p2 = V(E(i,2),:);
+            plot3([p1(1) p2(1)],[p1(2) p2(2)],[p1(3) p2(3)],'Color',[1 0 0]);
+        end
+    end
 end
