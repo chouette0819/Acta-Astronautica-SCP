@@ -15,6 +15,7 @@ Repo Layout
 - `GA-STM/` MATLAB classes and scripts (GimAlfriendSTM, SCP, baselines)
 - `startup.m` Adds `GA-STM/` recursively to MATLAB path
 - `run_qcqp_custom.m` QCQP-like run with fallback to `fmincon`
+- `GA-STM/SCP_KOZ_MILP.m` MILP-based AABB KOZ avoidance (L1 objective)
 - `custom_states.csv` Two rows `[x vx y vy z vz]` in meters (start/goal)
 - `prepare_custom_states.py` Helper to build `custom_states.csv` from `.npy`
 
@@ -38,6 +39,17 @@ Run: SCP with Ellipsoidal KOZ (simple)
 - Script: `GA-STM/SCP_Ellipsoid.m`
 - Reads `custom_states.csv` for start/goal, enforces an ellipsoidal KOZ only.
 - Produces `GA-STM/scp_ellipsoid_last.mat` and figures.
+
+Run: MILP with AABB KOZ (no SCP)
+- Script: `GA-STM/SCP_KOZ_MILP.m`
+- What it does:
+  - Builds discrete STM and solves a single-shot MILP with L1 objective.
+  - Approximates each implicit surface by an axis-aligned bounding box (AABB) via isosurface sampling, then enforces outside-of-box with mixed-integer big-M constraints along the horizon.
+  - Saves `GA-STM/scp_milp_last.mat` and plots.
+- Configure in-file:
+  - `expr_dir` (default: `C:\Users\98kim\Desktop\Acta-Astronautica\Funcs_ISS_expr`)
+  - domain `[-100,100] m` and grid resolution for sampling (`grid_res`)
+  - weights (`R, w_v, w_tr`), time grid (`dt,N`), and big-M/clearance (`bigM, face_eps`).
 
 Run: QCQP (custom start/goal)
 - Script: `run_qcqp_custom.m`
