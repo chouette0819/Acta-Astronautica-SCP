@@ -81,3 +81,23 @@ Local Git
 Notes
 - Large figure asset: `ISS_data3_mesh120_opac05_dull.fig` is used for optional overlay.
 - Images such as `koz_surfaces_with_path.png`, `scp_koz_results.png`, `compare_qp_scp.png` land in `GA-STM/`.
+
+PowerShell (Terminal) Commands
+- Set working directory:
+  - `Set-Location C:\Users\98kim\Desktop\SCP\Rendezvous`
+- MIQP (QP relaxation, default):
+  - `matlab -batch "startup; SCP_KOZ_MIQP"`
+- MIQP with Gurobi (exact MIQP; set solver='gurobi' in script):
+  - `matlab -batch "startup; addpath('C:\gurobi1202\win64\matlab'); SCP_KOZ_MIQP"`
+- SCP (implicit KOZ, successive convexification):
+  - `matlab -batch "startup; SCP_KOZ_QP"`
+- SCP (ellipsoidal KOZ):
+  - `matlab -batch "startup; SCP_Ellipsoid"`
+- QCQP (custom start/goal, fmincon fallback):
+  - `matlab -batch "startup; run_qcqp_custom"`
+- KOZ surfaces + path visualization:
+  - `matlab -batch "startup; plot_implicit_koz_and_path"`
+- QP vs SCP comparison plot:
+  - `matlab -batch "startup; compare_QP_SCP_plot"`
+- Absolute MATLAB path example:
+  - `& "C:\Program Files\MATLAB\R2023b\bin\matlab.exe" -batch "startup; SCP_KOZ_MIQP"`
